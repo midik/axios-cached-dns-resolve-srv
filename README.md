@@ -1,4 +1,10 @@
-# axios-cached-dns-resolve
+# axios-cached-dns-resolve-types
+
+----
+
+##### Fork of [axios-cached-dns-resolve](https://github.com/tcollinsworth/axios-cached-dns-resolve) with DNS entry types support. 
+
+---
 
 Axios uses node.js dns.lookup to resolve host names.
 dns.lookup is synchronous and executes on limited libuv thread pool.
