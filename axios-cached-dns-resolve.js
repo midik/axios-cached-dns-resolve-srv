@@ -128,7 +128,7 @@ export function registerInterceptor(axios) {
   })
 }
 
-export async function getAddress(host, type = 'a') {
+export async function getAddress(host, type = 'A') {
   const key = `${type}\\${host}`
   let dnsEntry = config.cache.get(key)
   if (dnsEntry) {
