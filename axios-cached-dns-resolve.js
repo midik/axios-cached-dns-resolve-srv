@@ -112,7 +112,7 @@ export function registerInterceptor(axios) {
 
       reqConfig.headers.Host = url.hostname // set hostname in header
 
-      url.hostname = await getAddress(url.hostname)
+      url.hostname = await getAddress(url.hostname, reqConfig.dnsEntryType)
       delete url.host // clear hostname
 
       if (reqConfig.baseURL) {
@@ -128,20 +128,21 @@ export function registerInterceptor(axios) {
   })
 }
 
-export async function getAddress(host) {
-  let dnsEntry = config.cache.get(host)
+export async function getAddress(host, type = 'a') {
+  const key = `${type}\\${host}`
+  let dnsEntry = config.cache.get(key)
   if (dnsEntry) {
     ++stats.hits
     dnsEntry.lastUsedTs = Date.now()
     // eslint-disable-next-line no-plusplus
     const ip = dnsEntry.ips[dnsEntry.nextIdx++ % dnsEntry.ips.length] // round-robin
-    config.cache.set(host, dnsEntry)
+    config.cache.set(key, dnsEntry)
     return ip
   }
   ++stats.misses
   if (log.isLevelEnabled('debug')) log.debug(`cache miss ${host}`)
 
-  const ips = await dnsResolve(host)
+  const ips = await dnsResolve(host, type)
   dnsEntry = {
     host,
     ips,
@@ -151,7 +152,7 @@ export async function getAddress(host) {
   }
   // eslint-disable-next-line no-plusplus
   const ip = dnsEntry.ips[dnsEntry.nextIdx++ % dnsEntry.ips.length] // round-robin
-  config.cache.set(host, dnsEntry)
+  config.cache.set(key, dnsEntry)
   return ip
 }
 
