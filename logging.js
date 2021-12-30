@@ -1,11 +1,16 @@
-import pino from 'pino'
+const pino = require('pino')
 
 let logger
 
-export function init(options) {
+function init(options) {
   return (logger = pino(options))
 }
 
-export function getLogger() {
+function getLogger() {
   return logger
+}
+
+module.exports = {
+  initLogger: init,
+  getLogger
 }

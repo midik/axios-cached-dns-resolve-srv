@@ -1,15 +1,14 @@
-/* eslint-disable no-plusplus */
-import dns from 'dns'
-import URL from 'url'
-import net from 'net'
-import stringify from 'json-stringify-safe'
-import LRUCache from 'lru-cache'
-import util from 'util'
-import { init as initLogger } from './logging.js'
+const dns = require('dns');
+const URL = require('url');
+const net = require('net');
+const stringify = require('json-stringify-safe');
+const LRUCache = require('lru-cache');
+const util = require('util');
+const { initLogger } = require('./logging');
 
-const dnsResolve = util.promisify(dns.resolve)
+const dnsResolve = util.promisify(dns.resolve);
 
-export const config = {
+const config = {
   disabled: process.env.AXIOS_DNS_DISABLE === 'true',
   dnsTtlMs: process.env.AXIOS_DNS_CACHE_TTL_MS || 5000, // when to refresh actively used dns entries (5 sec)
   cacheGraceExpireMultiplier: process.env.AXIOS_DNS_CACHE_EXPIRE_MULTIPLIER || 2, // maximum grace to use entry beyond TTL
@@ -25,19 +24,19 @@ export const config = {
     prettyPrint: process.env.NODE_ENV === 'DEBUG' || false,
     formatters: {
       level(label/* , number */) {
-        return { level: label }
+        return { level: label };
       },
     },
   },
   cache: undefined,
-}
+};
 
-export const cacheConfig = {
+const cacheConfig = {
   max: config.dnsCacheSize,
   maxAge: (config.dnsTtlMs * config.cacheGraceExpireMultiplier), // grace for refresh
-}
+};
 
-export const stats = {
+const stats = {
   dnsEntries: 0,
   refreshed: 0,
   hits: 0,
@@ -46,43 +45,43 @@ export const stats = {
   errors: 0,
   lastError: 0,
   lastErrorTs: 0,
+};
+
+let log;
+let backgroundRefreshId;
+let cachePruneId;
+
+init();
+
+function init() {
+  log = initLogger(config.logging);
+
+  if (config.cache) return;
+
+  config.cache = new LRUCache(cacheConfig);
+
+  startBackgroundRefresh();
+  startPeriodicCachePrune();
+  cachePruneId = setInterval(() => config.cache.prune(), config.dnsIdleTtlMs);
 }
 
-let log
-let backgroundRefreshId
-let cachePruneId
-
-init()
-
-export function init() {
-  log = initLogger(config.logging)
-
-  if (config.cache) return
-
-  config.cache = new LRUCache(cacheConfig)
-
-  startBackgroundRefresh()
-  startPeriodicCachePrune()
-  cachePruneId = setInterval(() => config.cache.prune(), config.dnsIdleTtlMs)
+function startBackgroundRefresh() {
+  if (backgroundRefreshId) clearInterval(backgroundRefreshId);
+  backgroundRefreshId = setInterval(backgroundRefresh, config.backgroundScanMs);
 }
 
-export function startBackgroundRefresh() {
-  if (backgroundRefreshId) clearInterval(backgroundRefreshId)
-  backgroundRefreshId = setInterval(backgroundRefresh, config.backgroundScanMs)
+function startPeriodicCachePrune() {
+  if (cachePruneId) clearInterval(cachePruneId);
+  cachePruneId = setInterval(() => config.cache.prune(), config.dnsIdleTtlMs);
 }
 
-export function startPeriodicCachePrune() {
-  if (cachePruneId) clearInterval(cachePruneId)
-  cachePruneId = setInterval(() => config.cache.prune(), config.dnsIdleTtlMs)
+function getStats() {
+  stats.dnsEntries = config.cache.length;
+  return stats;
 }
 
-export function getStats() {
-  stats.dnsEntries = config.cache.length
-  return stats
-}
-
-export function getDnsCacheEntries() {
-  return config.cache.values()
+function getDnsCacheEntries() {
+  return config.cache.values();
 }
 
 // const dnsEntry = {
@@ -97,103 +96,119 @@ export function getDnsCacheEntries() {
 //   updatedTs: 1555771516581,
 // }
 
-export function registerInterceptor(axios) {
-  if (config.disabled || !axios || !axios.interceptors) return // supertest
+function registerInterceptor(axios) {
+  if (config.disabled || !axios || !axios.interceptors) return; // supertest
   axios.interceptors.request.use(async (reqConfig) => {
     try {
-      let url
+      let url;
       if (reqConfig.baseURL) {
-        url = URL.parse(reqConfig.baseURL)
+        url = URL.parse(reqConfig.baseURL);
       } else {
-        url = URL.parse(reqConfig.url)
+        url = URL.parse(reqConfig.url);
       }
 
-      if (net.isIP(url.hostname)) return reqConfig // skip
+      if (net.isIP(url.hostname)) return reqConfig; // skip
 
-      reqConfig.headers.Host = url.hostname // set hostname in header
+      reqConfig.headers.Host = url.hostname; // set hostname in header
 
-      url.hostname = await getAddress(url.hostname, reqConfig.dnsEntryType)
-      delete url.host // clear hostname
+      url.hostname = await getAddress(url.hostname, reqConfig.dnsEntryType);
+      delete url.host; // clear hostname
 
       if (reqConfig.baseURL) {
-        reqConfig.baseURL = URL.format(url)
+        reqConfig.baseURL = URL.format(url);
       } else {
-        reqConfig.url = URL.format(url)
+        reqConfig.url = URL.format(url);
       }
     } catch (err) {
-      recordError(err, `Error getAddress, ${err.message}`)
+      recordError(err, `Error getAddress, ${err.message}`);
     }
 
-    return reqConfig
-  })
+    return reqConfig;
+  });
 }
 
-export async function getAddress(host, type = 'A') {
-  const key = `${type}\\${host}`
-  let dnsEntry = config.cache.get(key)
+async function getAddress(host, type = 'A') {
+  const key = `${type}\\${host}`;
+  let dnsEntry = config.cache.get(key);
   if (dnsEntry) {
-    ++stats.hits
-    dnsEntry.lastUsedTs = Date.now()
+    ++stats.hits;
+    dnsEntry.lastUsedTs = Date.now();
     // eslint-disable-next-line no-plusplus
-    const ip = dnsEntry.ips[dnsEntry.nextIdx++ % dnsEntry.ips.length] // round-robin
-    config.cache.set(key, dnsEntry)
-    return ip
+    const ip = dnsEntry.ips[dnsEntry.nextIdx++ % dnsEntry.ips.length]; // round-robin
+    config.cache.set(key, dnsEntry);
+    return ip;
   }
-  ++stats.misses
-  if (log.isLevelEnabled('debug')) log.debug(`cache miss ${host}`)
+  ++stats.misses;
+  if (log.isLevelEnabled('debug')) log.debug(`cache miss ${host}`);
 
-  const ips = await dnsResolve(host, type)
+  const ips = await dnsResolve(host, type);
   dnsEntry = {
     host,
     ips,
     nextIdx: 0,
     lastUsedTs: Date.now(),
     updatedTs: Date.now(),
-  }
+  };
   // eslint-disable-next-line no-plusplus
-  const ip = dnsEntry.ips[dnsEntry.nextIdx++ % dnsEntry.ips.length] // round-robin
-  config.cache.set(key, dnsEntry)
-  return ip
+  const ip = dnsEntry.ips[dnsEntry.nextIdx++ % dnsEntry.ips.length]; // round-robin
+  config.cache.set(key, dnsEntry);
+  return ip;
 }
 
-let backgroundRefreshing = false
-export async function backgroundRefresh() {
-  if (backgroundRefreshing) return // don't start again if currently iterating slowly
-  backgroundRefreshing = true
+let backgroundRefreshing = false;
+
+async function backgroundRefresh() {
+  if (backgroundRefreshing) return; // don't start again if currently iterating slowly
+  backgroundRefreshing = true;
   try {
     config.cache.forEach(async (value, key) => {
       try {
         if (value.updatedTs + config.dnsTtlMs > Date.now()) {
-          return // continue/skip
+          return; // continue/skip
         }
         if (value.lastUsedTs + config.dnsIdleTtlMs <= Date.now()) {
-          ++stats.idleExpired
-          config.cache.del(key)
-          return // continue
+          ++stats.idleExpired;
+          config.cache.del(key);
+          return; // continue
         }
 
-        const ips = await dnsResolve(value.host)
-        value.ips = ips
-        value.updatedTs = Date.now()
-        config.cache.set(key, value)
-        ++stats.refreshed
+        const ips = await dnsResolve(value.host);
+        value.ips = ips;
+        value.updatedTs = Date.now();
+        config.cache.set(key, value);
+        ++stats.refreshed;
       } catch (err) {
         // best effort
-        recordError(err, `Error backgroundRefresh host: ${key}, ${stringify(value)}, ${err.message}`)
+        recordError(err, `Error backgroundRefresh host: ${key}, ${stringify(value)}, ${err.message}`);
       }
-    })
+    });
   } catch (err) {
     // best effort
-    recordError(err, `Error backgroundRefresh, ${err.message}`)
+    recordError(err, `Error backgroundRefresh, ${err.message}`);
   } finally {
-    backgroundRefreshing = false
+    backgroundRefreshing = false;
   }
 }
 
 function recordError(err, errMesg) {
-  ++stats.errors
-  stats.lastError = err
-  stats.lastErrorTs = new Date().toISOString()
-  log.error(err, errMesg)
+  ++stats.errors;
+  stats.lastError = err;
+  stats.lastErrorTs = new Date().toISOString();
+  log.error(err, errMesg);
 }
+
 /* eslint-enable no-plusplus */
+
+module.exports = {
+  config,
+  cacheConfig,
+  stats,
+  init,
+  startBackgroundRefresh,
+  startPeriodicCachePrune,
+  getStats,
+  getDnsCacheEntries,
+  registerInterceptor,
+  getAddress,
+  backgroundRefresh,
+};

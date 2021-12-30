@@ -1,8 +1,8 @@
-import ava from 'ava'
-import delay from 'delay'
-import LRUCache from 'lru-cache'
-import axios from 'axios'
-import * as axiosCachingDns from '../index.js'
+const ava = require('ava')
+const delay = require('delay')
+const LRUCache = require('lru-cache')
+const axios = require('axios')
+const axiosCachingDns = require('../index.js')
 
 const test = ava.serial
 
@@ -65,7 +65,7 @@ test('query google caches and after idle delay uncached', async (t) => {
 
   const stats = axiosCachingDns.getStats()
   delete stats.refreshed
-  t.deepEqual(expectedStats, stats)
+  t.deepEqual(expectedStats, stats) // todo: broken
 })
 
 test('query google caches and refreshes', async (t) => {

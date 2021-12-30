@@ -2,11 +2,10 @@ module.exports = {
   files: [
     '**/__tests__/**/*test*.js',
   ],
-  failFast: true,
+  failFast: false,
   verbose: true,
   failWithoutAssertions: false,
   require: [
     'ignore-styles',
-    'esm',
   ],
 }
