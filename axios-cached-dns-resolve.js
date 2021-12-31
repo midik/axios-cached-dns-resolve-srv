@@ -122,7 +122,7 @@ async function getAddress(host, type = 'A') {
   let ips
   if (type === 'SRV') {
     const record = await dnsResolve(host, type)
-    ips = await dnsResolve(record[0])
+    ips = await dnsResolve(record[0].name)
   } else {
     ips = await dnsResolve(host, type)
   }

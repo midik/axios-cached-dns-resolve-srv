@@ -25,7 +25,6 @@ test.beforeEach(() => {
 
   axiosCachingDns.registerInterceptor(axiosClient)
 
-  axiosCachingDns.startBackgroundRefresh()
   axiosCachingDns.startPeriodicCachePrune()
 })
 
@@ -48,9 +47,9 @@ test('query google with baseURL and relative url', async (t) => {
 test('query google caches and after idle delay uncached', async (t) => {
   const resp = await axiosClient.get('http://amazon.com')
   t.truthy(resp.data)
-  t.truthy(axiosCachingDns.config.cache.get('amazon.com'))
+  t.truthy(axiosCachingDns.config.cache.get('ya.ru'))
   await delay(6000)
-  t.falsy(axiosCachingDns.config.cache.get('amazon.com'))
+  t.falsy(axiosCachingDns.config.cache.get('ya.ru'))
 
   const expectedStats = {
     dnsEntries: 0,
@@ -70,11 +69,11 @@ test('query google caches and after idle delay uncached', async (t) => {
 
 test('query google caches and refreshes', async (t) => {
   await axiosClient.get('http://amazon.com')
-  const { updatedTs } = axiosCachingDns.config.cache.get('amazon.com')
+  const { updatedTs } = axiosCachingDns.config.cache.get('ya.ru')
   const timeoutTime = Date.now() + 5000
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const dnsEntry = axiosCachingDns.config.cache.get('amazon.com')
+    const dnsEntry = axiosCachingDns.config.cache.get('ya.ru')
     if (!dnsEntry) t.fail('dnsEntry missing or expired')
     // console.log(dnsEntry)
     if (updatedTs !== dnsEntry.updatedTs) break
