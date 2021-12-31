@@ -1,6 +1,6 @@
 {
   "name": "axios-cached-dns-resolve-types",
-  "version": "3.0.8",
+  "version": "3.0.9",
   "main": "index",
   "description": "Caches dns resolutions made with async dns.resolve instead of default sync dns.lookup, refreshes in background",
   "scripts": {

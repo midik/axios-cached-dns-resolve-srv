@@ -86,12 +86,17 @@ function registerInterceptor(axios) {
         url = URL.parse(reqConfig.url)
       }
 
+      // todo skip localhost
       if (net.isIP(url.hostname)) return reqConfig // skip
 
       reqConfig.headers.Host = url.hostname // set hostname in header
 
-      url.hostname = await getAddress(url.hostname, reqConfig.dnsEntryType)
+      const { ip, port } = await getAddress(url.hostname, reqConfig.dnsEntryType)
+
+      url.hostname = ip
       delete url.host // clear hostname
+
+      if (port) url.port = port
 
       if (reqConfig.baseURL) {
         reqConfig.baseURL = URL.format(url)
@@ -120,8 +125,12 @@ async function getAddress(host, type = 'A') {
   if (log.isLevelEnabled('debug')) log.debug(`cache miss ${host}`)
 
   let ips
+  let port
+
   if (type === 'SRV') {
     const record = await dnsResolve(host, type)
+    // todo priority/weight
+    port = record[0].port
     ips = await dnsResolve(record[0].name)
   } else {
     ips = await dnsResolve(host, type)
@@ -130,6 +139,7 @@ async function getAddress(host, type = 'A') {
   dnsEntry = {
     type,
     host,
+    port,
     ips,
     nextIdx: 0,
     lastUsedTs: Date.now(),
@@ -137,7 +147,7 @@ async function getAddress(host, type = 'A') {
   }
   const ip = dnsEntry.ips[dnsEntry.nextIdx += 1 % dnsEntry.ips.length] // round-robin
   config.cache.set(key, dnsEntry)
-  return ip
+  return { ip, port }
 }
 
 function recordError(err, errMesg) {
