@@ -111,6 +111,11 @@ function registerInterceptor(axios) {
   })
 }
 
+function getNextIp(dnsEntry) {
+  // eslint-disable-next-line no-return-assign
+  return dnsEntry.ips[dnsEntry.nextIdx += 1 % dnsEntry.ips.length] // round-robin
+}
+
 async function getAddress(host, type = 'A') {
   const key = `${type}\\${host}`
 
@@ -118,7 +123,7 @@ async function getAddress(host, type = 'A') {
   if (dnsEntry) {
     stats.hits += 1
     dnsEntry.lastUsedTs = Date.now()
-    const ip = dnsEntry.ips[dnsEntry.nextIdx += 1 % dnsEntry.ips.length] // round-robin
+    const ip = getNextIp(dnsEntry)
     config.cache.set(key, dnsEntry)
     return { ip, port: dnsEntry.port }
   }
@@ -147,7 +152,7 @@ async function getAddress(host, type = 'A') {
     lastUsedTs: Date.now(),
     updatedTs: Date.now(),
   }
-  const ip = dnsEntry.ips[dnsEntry.nextIdx += 1 % dnsEntry.ips.length] // round-robin
+  const ip = getNextIp(dnsEntry)
   config.cache.set(key, dnsEntry)
   return { ip, port }
 }
