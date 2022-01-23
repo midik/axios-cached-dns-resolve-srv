@@ -120,7 +120,7 @@ async function getAddress(host, type = 'A') {
     dnsEntry.lastUsedTs = Date.now()
     const ip = dnsEntry.ips[dnsEntry.nextIdx += 1 % dnsEntry.ips.length] // round-robin
     config.cache.set(key, dnsEntry)
-    return ip
+    return { ip, port: dnsEntry.port }
   }
 
   stats.misses += 1
