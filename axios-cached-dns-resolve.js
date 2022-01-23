@@ -93,6 +93,9 @@ function registerInterceptor(axios) {
 
       const { ip, port } = await getAddress(url.hostname, reqConfig.dnsEntryType)
 
+      console.log(`IP: ${ip}`)
+      console.log(`port: ${port}`)
+
       url.hostname = ip
       delete url.host // clear hostname
 
@@ -113,14 +116,17 @@ function registerInterceptor(axios) {
 
 async function getAddress(host, type = 'A') {
   const key = `${type}\\${host}`
-  let dnsEntry = config.cache.get(key)
-  if (dnsEntry) {
-    stats.hits += 1
-    dnsEntry.lastUsedTs = Date.now()
-    const ip = dnsEntry.ips[dnsEntry.nextIdx += 1 % dnsEntry.ips.length] // round-robin
-    config.cache.set(key, dnsEntry)
-    return ip
-  }
+
+  // todo get cache back
+  // let dnsEntry = config.cache.get(key)
+  // if (dnsEntry) {
+  //   stats.hits += 1
+  //   dnsEntry.lastUsedTs = Date.now()
+  //   const ip = dnsEntry.ips[dnsEntry.nextIdx += 1 % dnsEntry.ips.length] // round-robin
+  //   config.cache.set(key, dnsEntry)
+  //   return ip
+  // }
+
   stats.misses += 1
   if (log.isLevelEnabled('debug')) log.debug(`cache miss ${host}`)
 
@@ -136,7 +142,7 @@ async function getAddress(host, type = 'A') {
     ips = await dnsResolve(host, type)
   }
 
-  dnsEntry = {
+  const dnsEntry = {
     type,
     host,
     port,
